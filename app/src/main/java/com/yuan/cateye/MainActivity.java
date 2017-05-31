@@ -23,6 +23,7 @@ import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.SparseIntArray;
 import android.view.Surface;
 import android.view.SurfaceHolder;
@@ -31,8 +32,16 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.yuan.cateye.youtu.Youtu;
+
+import org.json.JSONObject;
+
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+
+import static com.yuan.cateye.youtu.Config.APP_ID;
+import static com.yuan.cateye.youtu.Config.SECRET_ID;
+import static com.yuan.cateye.youtu.Config.SECRET_KEY;
 
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
@@ -55,6 +64,8 @@ private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
     private ImageReader mImageReader;
     private CameraCaptureSession mCameraCaptureSession;
     private CameraDevice mCameraDevice;
+
+    private String recognitionResult;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -117,7 +128,22 @@ private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
                 image.close();
                 final Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
                 if (bitmap != null){
-//                    iv_show.setImageBitmap(bitmap);
+                    //图像数据为bitmap
+                    //使用图像识别SDK
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                Youtu imageTag = new Youtu(APP_ID, SECRET_ID, SECRET_KEY, Youtu.API_YOUTU_END_POINT);
+                                JSONObject respose = imageTag.ImageTag(bitmap);
+                                Log.d("图像识别结果返回:", respose.toString());
+                                recognitionResult = respose.toString();
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }).start();
+
                 }
             }
         }, mianHandler);
