@@ -3,6 +3,7 @@ package com.yuan.cateye;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -32,20 +33,34 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.iflytek.cloud.SpeechConstant;
+import com.iflytek.cloud.SpeechSynthesizer;
+import com.iflytek.cloud.SpeechUtility;
+import com.iflytek.cloud.util.ResourceUtil;
+import com.iflytek.speech.SynthesizerListener;
 import com.yuan.cateye.youtu.Youtu;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Objects;
 
+import static com.iflytek.cloud.SpeechConstant.MODE_AUTO;
+import static com.iflytek.cloud.SpeechConstant.TYPE_CLOUD;
 import static com.yuan.cateye.youtu.Config.APP_ID;
 import static com.yuan.cateye.youtu.Config.SECRET_ID;
 import static com.yuan.cateye.youtu.Config.SECRET_KEY;
 
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
-private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
+    private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
+    final String strTextToSpeech = "点击屏幕开始识别";
+
 
     ///为了使照片竖直显示
     static {
@@ -64,14 +79,50 @@ private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
     private ImageReader mImageReader;
     private CameraCaptureSession mCameraCaptureSession;
     private CameraDevice mCameraDevice;
+    private Context context;
+    //1. 创建 SpeechSynthesizer 对象 , 第二个参数： 本地合成时传 InitListener
+    SpeechSynthesizer mTts = SpeechSynthesizer.createSynthesizer( this, null);
+    // 语音合成对象
+    private static com.iflytek.cloud.SynthesizerListener mSynListener;
+    //合并获取的标签名
+    String nameAll = "\b";
+    String confidenceAll = "\b";
 
-    private String recognitionResult;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         initView();
+        //申请权限
+        if (!(checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)) {
+            requestCameraPermission();
+        }
+        initSpeech();
+        speakText(strTextToSpeech);
+        Toast.makeText(MainActivity.this,strTextToSpeech,Toast.LENGTH_LONG).show();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        speakText(strTextToSpeech);
+        Toast.makeText(MainActivity.this,strTextToSpeech,Toast.LENGTH_LONG).show();
+    }
+
+    //申请权限
+    private static final int REQUEST_PERMISSION_CAMERA_CODE = 1;
+    private void requestCameraPermission() {
+        requestPermissions(new String[]{Manifest.permission.CAMERA}, REQUEST_PERMISSION_CAMERA_CODE);
+    }
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_PERMISSION_CAMERA_CODE) {
+            int grantResult = grantResults[0];
+        }
+        Intent intent = new Intent(MainActivity.this,MainActivity.class);
+        startActivity(intent);
     }
 
     private void initView() {
@@ -129,22 +180,48 @@ private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
                 final Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
                 if (bitmap != null){
                     //图像数据为bitmap
-                    //使用图像识别SDK
+                    //使用图像识别
                     new Thread(new Runnable() {
                         @Override
                         public void run() {
                             try {
                                 Youtu imageTag = new Youtu(APP_ID, SECRET_ID, SECRET_KEY, Youtu.API_YOUTU_END_POINT);
                                 JSONObject respose = imageTag.ImageTag(bitmap);
+                                JSONArray tagsArray = respose.getJSONArray("tags");
                                 Log.d("图像识别结果返回:", respose.toString());
-                                recognitionResult = respose.toString();
+                                    for (int i = 0; i<tagsArray.length(); i++){
+                                        Log.d("-------------------", String.valueOf(i));
+                                        JSONObject tag = (JSONObject) tagsArray.get(i);
+                                        String name = tag.getString("tag_name");
+                                        String confidence = tag .getString("tag_confidence");
+                                        nameAll += name+ "，";
+                                        confidenceAll += confidence + "，";
+                                        Log.d("----------------", nameAll);
+                                    }
+                                //将当前物体的信息合成发声
+                                if (nameAll != "\b") {
+                                    speakText("目前的是" + nameAll);
+                                    //Toast显示标签
+                                    Looper.prepare();
+                                    Toast.makeText(MainActivity.this,"目前的是" + nameAll, Toast.LENGTH_LONG).show();
+                                    Looper.loop();
+                                }
+                                else {
+                                    speakText("识别错误，请重试");
+                                    Looper.prepare();
+                                    Toast.makeText(MainActivity.this,"识别错误，请重试", Toast.LENGTH_LONG)
+                                            .show();
+                                    Looper.loop();
+                                }
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
                         }
                     }).start();
-
                 }
+                //清空标签
+                nameAll = "\b";
+                confidenceAll = "\b";
             }
         }, mianHandler);
         //获取摄像头管理
@@ -160,6 +237,8 @@ private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
             e.printStackTrace();
         }
     }
+
+
 
     /**
      * 摄像头创建监听
@@ -230,6 +309,7 @@ private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
 
     @Override
     public void onClick(View view) {
+        speakText("正在努力识别中，请稍等");
         takePicture();
     }
     /**
@@ -259,5 +339,25 @@ private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
+    }
+
+    private void initSpeech(){
+        SpeechUtility.createUtility(this, SpeechConstant.APPID +"=592ebbb8");
+    }
+
+    private void speakText(String textToSpeech){
+        //1. 创建 SpeechSynthesizer 对象 , 第二个参数： 本地合成时传 InitListener
+        SpeechSynthesizer mTts = SpeechSynthesizer.createSynthesizer( this, null);
+        mTts.setParameter(SpeechConstant. VOICE_NAME, "aisxping" ); // 设置发音人
+        mTts.setParameter(SpeechConstant. SPEED, "50" );// 设置语速
+        mTts.setParameter(SpeechConstant. VOLUME, "100" );// 设置音量，范围 0~100
+        //使用在线引擎
+        mTts.setParameter( SpeechConstant.ENGINE_TYPE, SpeechConstant.TYPE_CLOUD);
+        //设置合成音频保存位置（可自定义保存位置），保存在 “./sdcard/iflytek.pcm”
+        //保存在 SD 卡需要在 AndroidManifest.xml 添加写 SD 卡权限
+        //仅支持保存为 pcm 和 wav 格式， 如果不需要保存合成音频，注释该行代码
+        //        mTts.setParameter(SpeechConstant. TTS_AUDIO_PATH, "./sdcard/iflytek.pcm" );
+        //3.开始合成
+        mTts.startSpeaking( textToSpeech, mSynListener );
     }
 }

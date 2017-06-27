@@ -4,6 +4,9 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Base64;
 
+import com.yuan.cateye.youtu.sign.Base64Util;
+import com.yuan.cateye.youtu.sign.YoutuSign;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;

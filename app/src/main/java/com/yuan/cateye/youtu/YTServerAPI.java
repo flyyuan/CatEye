@@ -4,6 +4,10 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Base64;
 import android.util.Log;
+
+import com.yuan.cateye.youtu.sign.Base64Util;
+import com.yuan.cateye.youtu.sign.YoutuSign;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
